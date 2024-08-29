@@ -1,0 +1,318 @@
+// ==UserScript==
+// @name Tr3czz Predictor
+// @namespace http://tampermonkey.net/
+// @version 2.3
+// @description The Best Predictor On The Market
+// @author Tr3czz
+// @match https://bloxflip.com/*
+// @grant none
+// ==/UserScript==
+
+(function () {
+  "use strict";
+
+  // Theme and global state variables
+  let themeColor = "red";
+  let lastSlideTime = 0;
+  let currentSlideColor = "";
+  let yellowCount = 0;
+
+  // Function to set the theme color
+  function setTheme(color) {
+    const rgbaColor = color === "red" ? "rgba(255, 0, 0, 0.8)" :
+      color === "blue" ? "rgba(0, 0, 255, 0.8)" : "rgba(0, 255, 0, 0.8)";
+    document.documentElement.style.setProperty("--theme-color", rgbaColor);
+  }
+
+  // Initialize the theme color
+  setTheme(themeColor);
+
+  // Inject custom styles into the document
+  const styleElement = document.createElement("style");
+  styleElement.innerHTML = `
+    body { overflow: hidden; }
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(10px);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999;
+    }
+    .login-form, .main-menu, .settings-menu, .unrigger-form, 
+    .loading-overlay, .success-overlay, .mines-overlay, .slide-overlay {
+      background: #111; padding: 20px; border-radius: 10px;
+      box-shadow: 0 0 20px var(--theme-color); text-align: center;
+      animation: fadeIn 1s;
+    }
+    .login-form h2, .main-menu h2, .settings-menu h2, .unrigger-form h2, 
+    .loading-overlay h2, .success-overlay h2, .mines-overlay h2 {
+      margin-bottom: 20px; color: #fff;
+    }
+    .login-form input, .main-menu button, .settings-menu button, 
+    .unrigger-form input, .mines-overlay input {
+      width: 80%; padding: 8px; margin-bottom: 8px; border: none;
+      border-radius: 5px; background: #222; color: #fff;
+      font-size: 14px;
+    }
+    .login-form input:focus, .settings-menu button:focus, 
+    .unrigger-form input:focus, .mines-overlay input:focus {
+      outline: none; box-shadow: 0 0 10px var(--theme-color);
+    }
+    .login-form button, .main-menu button {
+      padding: 8px; border: none; border-radius: 5px;
+      background: var(--theme-color); color: #fff;
+      font-size: 14px; cursor: pointer; transition: background 0.3s, box-shadow 0.3s;
+    }
+    .login-form button:hover, .main-menu button:hover {
+      background: #ff4d4d; box-shadow: 0 0 20px var(--theme-color);
+    }
+    .settings-text {
+      color: #fff; cursor: pointer; margin-top: 10px;
+      display: inline-block;
+    }
+    .settings-text:hover { text-decoration: underline; }
+    .loading-overlay, .success-overlay {
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+    }
+    .loading-overlay .spinner {
+      border: 8px solid #222; border-top: 8px solid var(--theme-color);
+      border-radius: 50%; width: 40px; height: 40px;
+      animation: spin 1s linear infinite; margin-bottom: 20px;
+    }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .submit-text {
+      color: var(--theme-color); cursor: pointer;
+      text-decoration: underline;
+    }
+    .submit-text:hover { color: #fff; }
+    .safe-spot { background-color: green !important; color: white; }
+    .main-menu {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; width: 300px; /* Make menu wider */
+    }
+    .main-menu button { width: 100%; padding: 10px; }
+    .settings-text { margin-top: 20px; }
+    .slide-overlay { background-color: yellow; }
+  `;
+  document.head.appendChild(styleElement);
+
+  // Login overlay
+  const overlayElement = document.createElement("div");
+  overlayElement.className = "overlay";
+  const loginForm = document.createElement("div");
+  loginForm.className = "login-form";
+  const loginHeader = document.createElement("h2");
+  loginHeader.innerText = "Welcome To Tr3czz Predictor";
+  const keyInput = document.createElement("input");
+  keyInput.type = "password";
+  keyInput.placeholder = "Enter Key";
+  keyInput.id = "key";
+  const submitText = document.createElement("div");
+  submitText.className = "submit-text";
+  submitText.innerText = "Login";
+
+  submitText.onclick = function () {
+    const inputKey = document.getElementById("key").value;
+    if (inputKey === "nigga") {
+      overlayElement.style.animation = "fadeOut 1s";
+      setTimeout(() => {
+        overlayElement.style.display = "none";
+        document.body.style.overflow = "auto";
+        displayMainMenu();
+      }, 1000);
+    } else {
+      alert("Incorrect key!");
+    }
+  };
+
+  loginForm.appendChild(loginHeader);
+  loginForm.appendChild(keyInput);
+  loginForm.appendChild(submitText);
+  overlayElement.appendChild(loginForm);
+  document.body.appendChild(overlayElement);
+
+  // Display the main menu
+  function displayMainMenu() {
+    const mainMenu = document.createElement("div");
+    mainMenu.className = "main-menu";
+    mainMenu.style.position = "absolute";
+    mainMenu.style.top = "50%";
+    mainMenu.style.left = "50%";
+    mainMenu.style.transform = "translate(-50%, -50%)";
+
+    const menuHeader = document.createElement("h2");
+    menuHeader.innerText = "Main Menu";
+
+    const minesButton = createMenuButton("Mines", () => {
+      if (window.location.href === "https://bloxflip.com/mines") {
+        displayMinesOverlay();
+      } else {
+        alert("Mines button is only available on https://bloxflip.com/mines");
+      }
+    });
+
+    const fixMinesButton = createMenuButton("Fix Mines", resetMines);
+
+    const slideButton = createMenuButton("Slide", () => {
+      if (window.location.href === "https://bloxflip.com/roulette") {
+        displaySlideOverlay();
+      } else {
+        alert("Slide button is only available on https://bloxflip.com/roulette");
+      }
+    });
+
+    const unriggerButton = createMenuButton("Unrigger", displayUnriggerOverlay);
+
+    const settingsText = document.createElement("div");
+    settingsText.className = "settings-text";
+    settingsText.innerText = "Settings";
+    settingsText.onclick = displaySettingsMenu;
+
+    mainMenu.appendChild(menuHeader);
+    mainMenu.appendChild(minesButton);
+    mainMenu.appendChild(fixMinesButton);
+    mainMenu.appendChild(slideButton);
+    mainMenu.appendChild(unriggerButton);
+    mainMenu.appendChild(settingsText);
+    document.body.appendChild(mainMenu);
+
+    makeDraggable(mainMenu);
+  }
+
+  // Helper to create a button
+  function createMenuButton(text, onClick) {
+    const button = document.createElement("button");
+    button.innerText = text;
+    button.onclick = onClick;
+    return button;
+  }
+
+  // Resets the mines to remove any safe spots
+  function resetMines() {
+    const minesItems = document.querySelectorAll(".mines_minesGameItem__S2ytQ");
+    minesItems.forEach(item => {
+      item.classList.remove("safe-spot");
+    });
+  }
+
+  // Displays the slide overlay
+  function displaySlideOverlay() {
+    const currentTime = Date.now();
+    if (lastSlideTime && currentTime - lastSlideTime < 5000) {
+      showSlideOverlay(currentSlideColor);
+    } else {
+      currentSlideColor = getRandomSlideColor();
+      showSlideOverlay(currentSlideColor);
+      lastSlideTime = currentTime;
+    }
+  }
+
+  // Generates a random slide color
+  function getRandomSlideColor() {
+    const colors = ["yellow", "red", "purple"];
+    const selectedColor = colors[Math.floor(Math.random() * colors.length)];
+    if (selectedColor === "yellow") yellowCount++;
+    return selectedColor;
+  }
+
+  // Shows the slide overlay with the selected color
+  function showSlideOverlay(color) {
+    const slideOverlay = document.createElement("div");
+    slideOverlay.className = "overlay";
+    slideOverlay.innerHTML = `<div class="slide-overlay">Slide: ${color}</div>`;
+    document.body.appendChild(slideOverlay);
+    setTimeout(() => {
+      slideOverlay.style.animation = "fadeOut 1s";
+      setTimeout(() => {
+        slideOverlay.remove();
+      }, 1000);
+    }, 1000);
+  }
+
+  // Displays the settings menu
+  function displaySettingsMenu() {
+    const settingsMenu = document.createElement("div");
+    settingsMenu.className = "settings-menu";
+    settingsMenu.style.position = "absolute";
+    settingsMenu.style.top = "50%";
+    settingsMenu.style.left = "50%";
+    settingsMenu.style.transform = "translate(-50%, -50%)";
+
+    const settingsHeader = document.createElement("h2");
+    settingsHeader.innerText = "Settings";
+
+    const themeButtonRed = createMenuButton("Theme: Red", () => {
+      themeColor = "red";
+      setTheme(themeColor);
+    });
+
+    const themeButtonBlue = createMenuButton("Theme: Blue", () => {
+      themeColor = "blue";
+      setTheme(themeColor);
+    });
+
+    const themeButtonGreen = createMenuButton("Theme: Green", () => {
+      themeColor = "green";
+      setTheme(themeColor);
+    });
+
+    settingsMenu.appendChild(settingsHeader);
+    settingsMenu.appendChild(themeButtonRed);
+    settingsMenu.appendChild(themeButtonBlue);
+    settingsMenu.appendChild(themeButtonGreen);
+    document.body.appendChild(settingsMenu);
+
+    makeDraggable(settingsMenu);
+  }
+
+  // Displays the Mines overlay
+  function displayMinesOverlay() {
+    const minesOverlay = document.createElement("div");
+    minesOverlay.className = "overlay";
+    minesOverlay.innerHTML = `
+      <div class="mines-overlay">
+        <h2>Mines</h2>
+        <input type="text" placeholder="Click mines 1-24" class="mines-input">
+      </div>`;
+    document.body.appendChild(minesOverlay);
+  }
+
+  // Displays the Unrigger overlay
+  function displayUnriggerOverlay() {
+    const unriggerOverlay = document.createElement("div");
+    unriggerOverlay.className = "overlay";
+    unriggerOverlay.innerHTML = `
+      <div class="unrigger-form">
+        <h2>Unrigger</h2>
+        <input type="text" placeholder="Enter Unrig Key">
+      </div>`;
+    document.body.appendChild(unriggerOverlay);
+  }
+
+  // Makes a DOM element draggable
+  function makeDraggable(element) {
+    let isDragging = false;
+    let startX, startY;
+
+    element.addEventListener("mousedown", function (event) {
+      isDragging = true;
+      startX = event.clientX - element.getBoundingClientRect().left;
+      startY = event.clientY - element.getBoundingClientRect().top;
+      document.addEventListener("mousemove", onMouseMove);
+    });
+
+    document.addEventListener("mouseup", function () {
+      if (isDragging) {
+        isDragging = false;
+        document.removeEventListener("mousemove", onMouseMove);
+      }
+    });
+
+    function onMouseMove(event) {
+      element.style.left = `${event.clientX - startX}px`;
+      element.style.top = `${event.clientY - startY}px`;
+    }
+  }
+})();
